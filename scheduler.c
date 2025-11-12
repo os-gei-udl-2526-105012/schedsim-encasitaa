@@ -87,6 +87,8 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         procTable[p].completed = false;
     }
 
+    //fifo 
+    
     printSimulation(nprocs,procTable,duration);
 
     for (int p=0; p<nprocs; p++ ){
