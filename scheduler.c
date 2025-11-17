@@ -87,7 +87,33 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         procTable[p].completed = false;
     }
 
-    //fifo 
+    //FCFS
+    if(algorithm == FCFS){
+        int best_arr = INT_MAX;
+        for(size_t i=0;i<nprocs;i++){
+            if(remaining[i]>0 && procTable[i].arrive_time<=time){
+                if(procTable[i].arrive_time<best_arr){ best_arr = procTable[i].arrive_time; next=i; }
+            }
+        }
+    }
+    //PRIORITIES
+    else if(algorithm == PRIORITIES){
+        int best_pr = INT_MAX;
+        for(size_t i=0;i<nprocs;i++){
+            if(remaining[i]>0 && procTable[i].arrive_time<=time){
+                if(procTable[i].priority<best_pr){ best_pr = procTable[i].priority; next=i; }
+            }
+        }
+    }
+    //SJF
+    else if(algorithm == SJF){
+        int best_rem = INT_MAX;
+        for(size_t i=0;i<nprocs;i++){
+            if(remaining[i]>0 && procTable[i].arrive_time<=time){
+                if(remaining[i]<best_rem){ best_rem = remaining[i]; next=i; }
+            }
+        }
+    }
     
     printSimulation(nprocs,procTable,duration);
 
