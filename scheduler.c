@@ -73,47 +73,40 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
 
     qsort(procTable,nprocs,sizeof(Process),compareArrival);
 
-    init_queue();
-    size_t duration = getTotalCPU(procTable, nprocs) +1;
+    init_queue(); //inicialitzar la cua per RR
 
-    for (int p=0; p<nprocs; p++ ){
-        procTable[p].lifecycle = malloc( duration * sizeof(int));
-        for(int t=0; t<duration; t++){
-            procTable[p].lifecycle[t]=-1;
+    //calcular durada de la simulació suficient
+    size_t totalCPU = getTotalCPU(procTable, nprocs) +1;
+    int max_arrival = 0;
+    for(size_t i=0;i<nprocs;i++){
+        if(procTable[i].arrive_time>max_arrival){ 
+            max_arrival = procTable[i].arrive_time;
         }
-        procTable[p].waiting_time = 0;
-        procTable[p].return_time = 0;
+    }
+    size_t duration = totalCPU + max_arrival + 1;
+
+
+    //arrays de control 
+    int *remaining = malloc(nprocs*sizeof(int));  //CPU restant
+    int *started   = malloc(nprocs*sizeof(int));    //per response_time
+    if(!remaining || !started){ perror("malloc"); exit(1); }
+
+    //inicialitzar processos
+    for(size_t p=0; p<nprocs; p++){
+        remaining[p] = procTable[p].burst;
+        started[p]   = 0;
+
+        procTable[p].waiting_time  = 0;
+        procTable[p].return_time   = 0;
         procTable[p].response_time = 0;
-        procTable[p].completed = false;
+        procTable[p].completed     = false;
+    
+        procTable[p].lifecycle = malloc(duration*sizeof(int));
+        for(size_t t=0;t<duration;t++) {procTable[p].lifecycle[t] = -1;}
     }
+    
+    //kkk
 
-    //FCFS
-    if(algorithm == FCFS){
-        int best_arr = INT_MAX;
-        for(size_t i=0;i<nprocs;i++){
-            if(remaining[i]>0 && procTable[i].arrive_time<=time){
-                if(procTable[i].arrive_time<best_arr){ best_arr = procTable[i].arrive_time; next=i; }
-            }
-        }
-    }
-    //PRIORITIES
-    else if(algorithm == PRIORITIES){
-        int best_pr = INT_MAX;
-        for(size_t i=0;i<nprocs;i++){
-            if(remaining[i]>0 && procTable[i].arrive_time<=time){
-                if(procTable[i].priority<best_pr){ best_pr = procTable[i].priority; next=i; }
-            }
-        }
-    }
-    //SJF
-    else if(algorithm == SJF){
-        int best_rem = INT_MAX;
-        for(size_t i=0;i<nprocs;i++){
-            if(remaining[i]>0 && procTable[i].arrive_time<=time){
-                if(remaining[i]<best_rem){ best_rem = remaining[i]; next=i; }
-            }
-        }
-    }
     
     printSimulation(nprocs,procTable,duration);
 
