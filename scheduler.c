@@ -99,6 +99,10 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         procTable[p].completed = false;
     
         procTable[p].lifecycle = malloc(duration * sizeof(int));
+        if(procTable[p].lifecycle == NULL){
+            perror("malloc lifecycle");
+            exit(1);
+        }
         for(size_t t = 0; t < duration; t++) {
             procTable[p].lifecycle[t] = -1;
         }
@@ -107,7 +111,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
     //variables del planificador
     int time = 0;
     int finished = 0;
-    int current = -1;	//procés seleccionat
+    int current = -1; //procés seleccionat
     int rr_counter = 0;	//comptador RR
 
 
@@ -115,13 +119,12 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
 
     while(finished < (int)nprocs)
     {
-        //marcar processos que acaben d’arribar 
+        //processos que arriben
         for(size_t p = 0; p < nprocs; p++){
             if(procTable[p].arrive_time == time){
                 enqueue(&procTable[p]); //entren a la cua (serveix per RR)
             }  
         }
-
         int next = -1;
 
 
@@ -132,7 +135,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
                 //buscar primer procés "ready"
                 for(size_t p = 0; p < nprocs; p++){
                     if(!procTable[p].completed && procTable[p].arrive_time <= time && remaining[p] > 0){
-                        next = p;
+                        next = (int)p;
                         break;
                     }
                 }
@@ -147,7 +150,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             for(size_t p = 0; p < nprocs; p++){
                 if(!procTable[p].completed && procTable[p].arrive_time <= time && remaining[p] > 0){
                     if(best == -1 || remaining[p] < remaining[best]){
-                        best = p;
+                        best = (int)p;
                     }
                 }
             }
@@ -164,7 +167,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             for(size_t p = 0; p < nprocs; p++){
                 if(!procTable[p].completed && procTable[p].arrive_time <= time && remaining[p] > 0){
                     if(best == -1 || procTable[p].priority < procTable[best].priority){
-                        best = p;
+                        best =(int)p;
                     }
                 }
             }
@@ -180,8 +183,23 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             if(current == -1 || rr_counter >= quantum){
                 if(get_queue_size() > 0){
                     Process *p = dequeue();
-                    next = (int)(p - procTable); //calcular l'índex real dins procTable
-                    enqueue(p);
+                    if(p == NULL){ //cua buida o error
+                        next = -1;
+                    }
+                    else{
+                        //calculem l'índex basat en el punter retornat
+                        ptrdiff_t idx = p - procTable;
+                        if(idx >= 0 && (size_t)idx < nprocs){
+                            next = (int)idx;
+                            //tornar a encolar el mateix punter al final
+                            enqueue(p);
+                        }
+                        else{ 
+                            //punter invàlid dins la cua
+                            next = -1;
+                        }
+
+                    }
                     rr_counter = 0;
                 }
             } 
@@ -226,11 +244,20 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             rr_counter = 0;
 
             //marquem estat de finalitzat
-            if(time + 1 < (int)duration){
+            if((size_t)(time + 1) < duration){
                 procTable[next].lifecycle[time+1] = Finished;
             }
         }
         time++;
+    }
+
+    //calcular waiting_time comptant Ready en lifecycle
+    for(size_t p = 0; p < nprocs; p++){
+        size_t w = 0;
+        for(size_t t = 0; t < duration; t++){
+            if(procTable[p].lifecycle[t] == Ready) w++;
+        }
+        procTable[p].waiting_time = (int)w;
     }
 
     //MOSTRAR RESULTATS 
@@ -242,6 +269,15 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
 
     free(remaining);
     free(started);
+
+    //alliberem lifecycle per evitar acumulació de memòria
+    for(size_t p = 0; p < nprocs; p++){
+        if(procTable[p].lifecycle){
+            free(procTable[p].lifecycle);
+            procTable[p].lifecycle = NULL;
+        }
+    }
+
     cleanQueue();
 
     return EXIT_SUCCESS;
