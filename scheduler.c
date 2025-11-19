@@ -76,30 +76,30 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
     //calcular durada de la simulació suficient
     size_t totalCPU = getTotalCPU(procTable, nprocs) +1;
     int max_arrival = 0;
-    for(size_t i=0;i<nprocs;i++){
-        if(procTable[i].arrive_time>max_arrival){ 
+    for(size_t i = 0; i < nprocs; i++){
+        if(procTable[i].arrive_time > max_arrival){ 
             max_arrival = procTable[i].arrive_time;
         }
     }
     size_t duration = totalCPU + (size_t)max_arrival + 1u;
 
     //arrays de control 
-    int *remaining = malloc(nprocs*sizeof(int));  //CPU restant
-    int *started   = malloc(nprocs*sizeof(int));  //per response_time
+    int *remaining = malloc(nprocs * sizeof(int));  //CPU restant
+    int *started   = malloc(nprocs * sizeof(int));  //per response_time
     if(!remaining || !started){ perror("malloc"); exit(1); }
 
     //inicialitzar processos
-    for(size_t p=0; p<nprocs; p++){
+    for(size_t p = 0; p < nprocs; p++){
         remaining[p] = procTable[p].burst;
         started[p]   = 0;
 
-        procTable[p].waiting_time  = 0;
-        procTable[p].return_time   = 0;
+        procTable[p].waiting_time = 0;
+        procTable[p].return_time = 0;
         procTable[p].response_time = 0;
-        procTable[p].completed     = false;
+        procTable[p].completed = false;
     
-        procTable[p].lifecycle = malloc(duration*sizeof(int));
-        for(size_t t=0;t<duration;t++) {
+        procTable[p].lifecycle = malloc(duration * sizeof(int));
+        for(size_t t = 0; t < duration; t++) {
             procTable[p].lifecycle[t] = -1;
         }
     }
@@ -116,7 +116,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
     while(finished < (int)nprocs)
     {
         //marcar processos que acaben d’arribar 
-        for(int p=0; p<nprocs; p++){
+        for(size_t p = 0; p < nprocs; p++){
             if(procTable[p].arrive_time == time){
                 enqueue(&procTable[p]); //entren a la cua (serveix per RR)
             }  
@@ -124,12 +124,13 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
 
         int next = -1;
 
+
         //SELECCIÓ D'ALGORISME
 
         if(algorithm == FCFS){
             if(current == -1 || modality == PREEMPTIVE){
                 //buscar primer procés "ready"
-                for(int p=0; p<nprocs; p++){
+                for(size_t p = 0; p < nprocs; p++){
                     if(!procTable[p].completed && procTable[p].arrive_time <= time && remaining[p] > 0){
                         next = p;
                         break;
@@ -143,7 +144,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
 
         else if(algorithm == SJF){
             int best = -1;
-            for(int p=0; p<nprocs; p++){
+            for(size_t p = 0; p < nprocs; p++){
                 if(!procTable[p].completed && procTable[p].arrive_time <= time && remaining[p] > 0){
                     if(best == -1 || remaining[p] < remaining[best]){
                         best = p;
@@ -160,7 +161,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
 
         else if(algorithm == PRIORITIES){
             int best = -1;
-            for(int p=0; p<nprocs; p++){
+            for(size_t p = 0; p < nprocs; p++){
                 if(!procTable[p].completed && procTable[p].arrive_time <= time && remaining[p] > 0){
                     if(best == -1 || procTable[p].priority < procTable[best].priority){
                         best = p;
@@ -179,7 +180,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             if(current == -1 || rr_counter >= quantum){
                 if(get_queue_size() > 0){
                     Process *p = dequeue();
-                    next = p->id;
+                    next = (int)(p - procTable); //calcular l'índex real dins procTable
                     enqueue(p);
                     rr_counter = 0;
                 }
@@ -203,8 +204,8 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         }
 
         //marcar estat
-        for(int k=0;k<nprocs;k++){
-            if(k == next){
+        for(size_t k = 0; k < nprocs; k++){
+            if(k == (size_t)next){
                 procTable[k].lifecycle[time] = Running;
             }
             else if(!procTable[k].completed && procTable[k].arrive_time <= time){
@@ -223,8 +224,12 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             procTable[next].return_time = time - procTable[next].arrive_time + 1;
             finished++;
             rr_counter = 0;
-        }
 
+            //marquem estat de finalitzat
+            if(time + 1 < (int)duration){
+                procTable[next].lifecycle[time+1] = Finished;
+            }
+        }
         time++;
     }
 
