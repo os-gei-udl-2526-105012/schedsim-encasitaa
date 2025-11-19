@@ -67,8 +67,6 @@ int getCurrentBurst(Process* proc, int current_time){
     return burst;
 }
 
-int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modality, int quantum){
-
     
 int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modality, int quantum){
 
