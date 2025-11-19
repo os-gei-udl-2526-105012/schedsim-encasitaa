@@ -69,8 +69,6 @@ int getCurrentBurst(Process* proc, int current_time){
 
 int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modality, int quantum){
 
-    Process * _proclist;
-
     qsort(procTable,nprocs,sizeof(Process),compareArrival);
 
     init_queue(); //inicialitzar la cua per RR
@@ -83,7 +81,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
             max_arrival = procTable[i].arrive_time;
         }
     }
-    size_t duration = totalCPU + max_arrival + 1;
+    size_t duration = totalCPU + (size_t)max_arrival + 1u;
 
     //arrays de control 
     int *remaining = malloc(nprocs*sizeof(int));  //CPU restant
@@ -233,7 +231,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
     //MOSTRAR RESULTATS 
 
     printSimulation(nprocs, procTable, duration);
-    printMetrics(time-1, nprocs, procTable);
+    printMetrics((size_t)(time-1), nprocs, procTable);
 
     //NETEJA 
 
