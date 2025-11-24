@@ -38,6 +38,3 @@ int comparePriority(const void *s1, const void *s2);
 void printLife(Process* p, int t);
 
 #endif
-
-
-

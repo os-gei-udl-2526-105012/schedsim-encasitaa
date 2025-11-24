@@ -26,4 +26,9 @@ void printSimulation(size_t nprocs, Process *procTable, size_t duration);
 int getCurrentBurst(Process* proc, int current_time);
 size_t getTotalCPU(Process *procTable, size_t nprocs);
 
+// Prototips de les funcions auxiliars
+static int fcfs(Process *procTable, size_t nprocs);
+static int sjf(Process *procTable, size_t nprocs, int preemptive);
+static int rr(Process *procTable, size_t nprocs, int quantum);
+static int priority(Process *procTable, size_t nprocs, int preemptive);
 #endif
