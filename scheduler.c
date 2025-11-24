@@ -212,12 +212,14 @@ static int fcfs(Process *procTable, size_t nprocs)
     for (size_t p = 0; p < nprocs; p++)
     {
         // Esperar si el proceso llega más tarde que el tiempo actual
-        if (procTable[p].arrive_time > current_time) {
+        if (procTable[p].arrive_time > current_time)
+        {
             current_time = procTable[p].arrive_time;
         }
 
         // Ejecutar el proceso desde current_time hasta que termine
-        for (int t = current_time; t < current_time + procTable[p].burst; t++) {
+        for (int t = current_time; t < current_time + procTable[p].burst; t++)
+        {
             procTable[p].lifecycle[t] = Running;
         }
 
@@ -240,7 +242,7 @@ static int sjf(Process *procTable, size_t nprocs, int preemptive)
 
     while (completed < nprocs)
     {
-        int best = -1;  // usamos int para evitar el warning de size_t
+        int best = -1;
         for (size_t p = 0; p < nprocs; p++)
         {
             if (!procTable[p].completed && procTable[p].arrive_time <= current_time)
