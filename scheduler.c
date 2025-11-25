@@ -102,7 +102,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         procTable[p].completed = false;
     }
 
-    // 🔹 Selección del algoritmo
+    //Selecció del algoritme
     switch (algorithm)
     {
     case FCFS:
@@ -284,13 +284,105 @@ static int sjf(Process *procTable, size_t nprocs, int preemptive)
 static int rr(Process *procTable, size_t nprocs, int quantum)
 {
     printf("Ejecutando Round Robin con quantum=%d...\n", quantum);
-    // TODO: usar la cola para repartir CPU en quántums
+    int current_time = 0;
+    size_t completed = 0;
+
+    init_queue();
+
+    while (completed < nprocs){
+        //afegim processos que arriben en aquest instant
+        for (size_t p = 0; p < nprocs; p++){
+            if (!procTable[p].completed && procTable[p].arrive_time == current_time){
+                enqueue(&procTable[p]);
+            }
+        }
+
+        if (isEmpty()){
+            current_time++;
+            continue;
+        }
+
+        Process *proc = dequeue();
+
+        //si és la primera vegada que s’executa, calculem response_time
+        if (proc->response_time == 0 && current_time >= proc->arrive_time){
+            proc->response_time = current_time - proc->arrive_time;
+        }
+
+        int run_time = (proc->burst - getCurrentBurst(proc, current_time) < quantum) ? proc->burst - getCurrentBurst(proc, current_time): quantum;
+
+        for (int t = current_time; t < current_time + run_time; t++){
+            proc->lifecycle[t] = Running;
+        }
+
+        current_time += run_time;
+
+        //afegim processos que arriben mentre aquest s’executava
+        for (size_t p = 0; p < nprocs; p++){
+            if (!procTable[p].completed && procTable[p].arrive_time > current_time - run_time && procTable[p].arrive_time <= current_time){
+                enqueue(&procTable[p]);
+            }
+        }
+
+        if (getCurrentBurst(proc, current_time) == proc->burst){
+            proc->completed = true;
+            proc->return_time = current_time;
+            proc->waiting_time = proc->return_time - proc->arrive_time - proc->burst;
+            completed++;
+        }
+        else{
+            enqueue(proc);
+        }
+    }
     return 0;
 }
 
 static int priority(Process *procTable, size_t nprocs, int preemptive)
 {
     printf("Ejecutando Prioridad %s...\n", preemptive ? "(preemptivo)" : "(no preemptivo)");
-    // TODO: seleccionar proceso con mayor prioridad
+    int current_time = 0;
+    size_t completed = 0;
+
+    while (completed < nprocs){
+        int best = -1;
+        for (size_t p = 0; p < nprocs; p++){
+            if (!procTable[p].completed && procTable[p].arrive_time <= current_time){
+                if (best == -1 || procTable[p].priority < procTable[best].priority){
+                    best = (int)p;
+                }
+            }
+        }
+
+        if (best == -1){
+            current_time++;
+            continue;
+        }
+
+        Process *proc = &procTable[best];
+
+        if (!preemptive){
+            //no preemptiu: executa fins acabar
+            for (int t = current_time; t < current_time + proc->burst; t++){
+                proc->lifecycle[t] = Running;
+            }
+            proc->completed = true;
+            proc->response_time = current_time - proc->arrive_time;
+            proc->waiting_time = proc->response_time;
+            current_time += proc->burst;
+            proc->return_time = current_time;
+            completed++;
+        }
+        else{
+            //preemptiu: executa 1 unitat i torna a decidir
+            proc->lifecycle[current_time] = Running;
+            if (getCurrentBurst(proc, current_time + 1) == proc->burst){
+                proc->completed = true;
+                proc->return_time = current_time + 1;
+                proc->waiting_time = proc->return_time - proc->arrive_time - proc->burst;
+                completed++;
+            }
+            current_time++;
+        }
+    }
     return 0;
 }
