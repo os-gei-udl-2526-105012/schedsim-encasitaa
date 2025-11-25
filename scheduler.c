@@ -203,7 +203,7 @@ void printMetrics(size_t simulationCPUTime, size_t nprocs, Process *procTable)
     printf("= averageReturnTime: %lf\n", (averageReturnTime / (double)nprocs));
 }
 
-static int fcfs(Process *procTable, size_t nprocs)
+int fcfs(Process *procTable, size_t nprocs)
 {
     printf("Ejecutando FCFS...\n");
 
@@ -233,7 +233,7 @@ static int fcfs(Process *procTable, size_t nprocs)
     return 0;
 }
 
-static int sjf(Process *procTable, size_t nprocs, int preemptive)
+int sjf(Process *procTable, size_t nprocs, int preemptive)
 {
     printf("Ejecutando %s...\n", preemptive ? "SJRT (preemptivo)" : "SJF (no preemptivo)");
 
@@ -281,7 +281,7 @@ static int sjf(Process *procTable, size_t nprocs, int preemptive)
     return 0;
 }
 
-static int rr(Process *procTable, size_t nprocs, int quantum)
+int rr(Process *procTable, size_t nprocs, int quantum)
 {
     printf("Ejecutando Round Robin con quantum=%d...\n", quantum);
     int current_time = 0;
@@ -348,7 +348,7 @@ static int rr(Process *procTable, size_t nprocs, int quantum)
     return 0;
 }
 
-static int priority(Process *procTable, size_t nprocs, int preemptive)
+int priority(Process *procTable, size_t nprocs, int preemptive)
 {
     printf("Ejecutando Prioridad %s...\n", preemptive ? "(preemptivo)" : "(no preemptivo)");
     int current_time = 0;
