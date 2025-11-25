@@ -105,21 +105,21 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
     //Selecció del algoritme
     switch (algorithm)
     {
-    case FCFS:
-        fcfs(procTable, nprocs);
-        break;
-    case SJF:
-        sjf(procTable, nprocs, modality == PREEMPTIVE ? 1 : 0);
-        break;
-    case RR:
-        rr(procTable, nprocs, quantum);
-        break;
-    case PRIORITIES:
-        priority(procTable, nprocs, modality);
-        break;
-    default:
-        fprintf(stderr, "Algoritmo desconocido: %d\n", algorithm);
-        break;
+        case FCFS:
+            fcfs(procTable, nprocs);
+            break;
+        case SJF:
+            sjf(procTable, nprocs, modality == PREEMPTIVE ? 1 : 0);
+            break;
+        case RR:
+            rr(procTable, nprocs, quantum);
+            break;
+        case PRIORITIES:
+            priority(procTable, nprocs, modality);
+            break;
+        default:
+            fprintf(stderr, "Algoritmo desconocido: %d\n", algorithm);
+            break;
     }
 
     printSimulation(nprocs, procTable, duration);
@@ -287,51 +287,62 @@ static int rr(Process *procTable, size_t nprocs, int quantum)
     int current_time = 0;
     size_t completed = 0;
 
-    init_queue();
+    //fem servir _proclist com a array de punters a processos
+    Process* _proclist[nprocs];
+    size_t ready_count = 0;
 
-    while (completed < nprocs){
+    while (completed < nprocs) {
         //afegim processos que arriben en aquest instant
         for (size_t p = 0; p < nprocs; p++){
             if (!procTable[p].completed && procTable[p].arrive_time == current_time){
-                enqueue(&procTable[p]);
+                _proclist[ready_count++] = &procTable[p];
             }
         }
 
-        if (isEmpty()){
+        if (ready_count == 0){
             current_time++;
             continue;
         }
 
-        Process *proc = dequeue();
+        //agafem el primer procés de la llista
+        Process *proc = _proclist[0];
 
-        //si és la primera vegada que s’executa, calculem response_time
-        if (proc->response_time == 0 && current_time >= proc->arrive_time){
+        //desplacem la resta cap a l’esquerra (com una cua)
+        for (size_t i = 1; i < ready_count; i++){
+            _proclist[i-1] = _proclist[i];
+        }
+        ready_count--;
+
+        //temps de resposta si és la primera execució
+        if (proc->response_time < 0 && current_time >= proc->arrive_time){
             proc->response_time = current_time - proc->arrive_time;
         }
 
-        int run_time = (proc->burst - getCurrentBurst(proc, current_time) < quantum) ? proc->burst - getCurrentBurst(proc, current_time): quantum;
+        int remaining = proc->burst - getCurrentBurst(proc, current_time);
+        int run_time  = (remaining < quantum) ? remaining : quantum;
 
         for (int t = current_time; t < current_time + run_time; t++){
             proc->lifecycle[t] = Running;
         }
-
         current_time += run_time;
 
-        //afegim processos que arriben mentre aquest s’executava
+        //afegim processos que han arribat mentre aquest s’executava
         for (size_t p = 0; p < nprocs; p++){
-            if (!procTable[p].completed && procTable[p].arrive_time > current_time - run_time && procTable[p].arrive_time <= current_time){
-                enqueue(&procTable[p]);
+            if (!procTable[p].completed && procTable[p].arrive_time > (current_time - run_time) && procTable[p].arrive_time <= current_time){
+                _proclist[ready_count++] = &procTable[p];
             }
         }
 
-        if (getCurrentBurst(proc, current_time) == proc->burst){
-            proc->completed = true;
-            proc->return_time = current_time;
+        //comprovem si ha acabat
+        int remAfter = proc->burst - getCurrentBurst(proc, current_time);
+        if (remAfter == 0){
+            proc->completed    = true;
+            proc->return_time  = current_time;
             proc->waiting_time = proc->return_time - proc->arrive_time - proc->burst;
             completed++;
-        }
-        else{
-            enqueue(proc);
+        } else{
+            //si no ha acabat, el tornem a posar al final de la llista
+            _proclist[ready_count++] = proc;
         }
     }
     return 0;
