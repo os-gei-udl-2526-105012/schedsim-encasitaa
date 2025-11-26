@@ -310,31 +310,21 @@ int rr(Process *procTable, size_t nprocs, int quantum)
     int current_time = 0;
     size_t completed = 0;
 
-    //fem servir _proclist com a array de punters a processos
-    Process* _proclist[nprocs];
-    size_t ready_count = 0;
-
     while (completed < nprocs) {
         //afegim processos que arriben en aquest instant
         for (size_t p = 0; p < nprocs; p++){
             if (!procTable[p].completed && procTable[p].arrive_time == current_time){
-                _proclist[ready_count++] = &procTable[p];
+                enqueue(&procTable[p]);
             }
         }
 
-        if (ready_count == 0){
+        if (get_queue_size() == 0){
             current_time++;
             continue;
         }
 
         //agafem el primer procés de la llista
-        Process *proc = _proclist[0];
-
-        //desplacem la resta cap a l’esquerra (com una cua)
-        for (size_t i = 1; i < ready_count; i++){
-            _proclist[i-1] = _proclist[i];
-        }
-        ready_count--;
+        Process *proc = dequeue();
 
         //temps de resposta si és la primera execució
         if (proc->response_time < 0 && current_time >= proc->arrive_time){
@@ -352,7 +342,7 @@ int rr(Process *procTable, size_t nprocs, int quantum)
         //afegim processos que han arribat mentre aquest s’executava
         for (size_t p = 0; p < nprocs; p++){
             if (!procTable[p].completed && procTable[p].arrive_time > (current_time - run_time) && procTable[p].arrive_time <= current_time){
-                _proclist[ready_count++] = &procTable[p];
+                enqueue(&procTable[p]);
             }
         }
 
@@ -365,7 +355,7 @@ int rr(Process *procTable, size_t nprocs, int quantum)
             completed++;
         } else{
             //si no ha acabat, el tornem a posar al final de la llista
-            _proclist[ready_count++] = proc;
+            enqueue(proc);
         }
     }
     return 0;
