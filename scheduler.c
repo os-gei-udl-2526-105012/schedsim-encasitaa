@@ -239,26 +239,26 @@ int sjf(Process *procTable, size_t nprocs, int preemptive)
 
     while (completed < nprocs)
     {
-        int best = -1;
+        int posBest = -1;
         for (size_t p = 0; p < nprocs; p++)
         {
             if (!procTable[p].completed && procTable[p].arrive_time <= current_time)
             {
-                if (best == -1 || procTable[p].burst < procTable[best].burst)
+                if (posBest == -1 || procTable[p].burst < procTable[posBest].burst)
                 {
-                    best = (int)p;
+                    posBest = (int)p;
                 }
             }
         }
 
-        if (best == -1)
+        if (posBest == -1)
         {
             // No hay proceso disponible todavía, avanzamos el tiempo
             current_time++;
             continue;
         }
 
-        Process *proc = &procTable[best];
+        Process *proc = &procTable[posBest];
 
         // Ejecutar el proceso seleccionado
         for (int t = current_time; t < current_time + proc->burst; t++)
@@ -285,92 +285,66 @@ int sjf(Process *procTable, size_t nprocs, int preemptive)
     int current_time = 0;
     size_t completed = 0;
 
-    while (completed < nprocs)
-    {
-        int best = -1;
-        for (size_t p = 0; p < nprocs; p++)
-        {
-            if (!procTable[p].completed && procTable[p].arrive_time <= current_time)
-            {
-                if (best == -1 || procTable[p].burst < procTable[best].burst)
-                {
-                    best = (int)p;
-                }
+    while (completed < nprocs) {
+        int posBest = -1;  //posició del millor 
+        int best_remaining = 0;  //temps restant del millor procés
+
+        for (size_t p = 0; p < nprocs; p++) {
+
+            //Si el proces no ha arribat o ja ha finalitzat continuem a la seguent iteració
+            if (procTable[p].completed || procTable[p].arrive_time > current_time) continue;
+
+            int remaining;
+
+            if (preemptive) {
+                //SJRT - Temps restant - el ja executat 
+                remaining = procTable[p].burst - getCurrentBurst(&procTable[p], current_time);
+            }
+            else {
+                //SJF - Directament el burst total, executarem proces fins el final
+                remaining = procTable[p].burst;
+            }
+
+            if (posBest == -1 || remaining < best_remaining) { //Elegim el que tingui menys temps restant
+                posBest = (int)p;
+                best_remaining = remaining;
             }
         }
 
-        if (best == -1)
-        {
-            // No hay proceso disponible todavía, avanzamos el tiempo
-            current_time++;
-            continue;
-        }
+        Process *proc = &procTable[posBest];
 
-        Process *proc = &procTable[best];
-
-        // Ejecutar el proceso seleccionado
-        for (int t = current_time; t < current_time + proc->burst; t++)
-        {
-            proc->lifecycle[t] = Running;
-        }
-
-        proc->completed = true;
-        proc->response_time = current_time - proc->arrive_time;
-        proc->waiting_time = proc->response_time;
-        current_time += proc->burst;
-        proc->return_time = current_time;
-
-        completed++;
-    }
-
-    return 0;
-}
-
-int sjrt(Process *procTable, size_t nprocs, int preemptive)
-{
-    printf("Ejecutando %s...\n", preemptive ? "SJRT (preemptivo)" : "SJF (no preemptivo)");
-
-    int current_time = 0;
-    size_t completed = 0;
-
-    while (completed < nprocs)
-    {
-        int best = -1;
-        for (size_t p = 0; p < nprocs; p++)
-        {
-            if (!procTable[p].completed && procTable[p].arrive_time <= current_time)
-            {
-                if (best == -1 || procTable[p].burst < procTable[best].burst)
-                {
-                    best = (int)p;
-                }
+        if (!preemptive){
+            //SJF no preemptive
+            for (int t = current_time; t < current_time + proc->burst; t++) {
+                proc->lifecycle[t] = Running;  //fem el matex que abans i posem running fins a finalitzar procés
             }
-        }
 
-        if (best == -1)
-        {
-            // No hay proceso disponible todavía, avanzamos el tiempo
+            proc->completed = true;
+            proc->response_time = current_time - proc->arrive_time;
+            proc->waiting_time = proc->response_time;
+            current_time += proc->burst;
+            proc->return_time = current_time;
+            completed++;
+        }
+        else {
+            //SJRT (com el sjf pero mirem el més eficient que entra en cada instant de temps)
+
+            int executed_before = getCurrentBurst(proc, current_time); //guardem per saber si el proces ja ha sigut executat
+            if (executed_before == 0 && current_time >= proc->arrive_time) {
+                proc->response_time = current_time - proc->arrive_time;  //si no ha sigut executat previament, guardem quan s'ha tardat en atendre desde que ha entrat
+            }
+
+            proc->lifecycle[current_time] = Running;
+
+            if (getCurrentBurst(proc, current_time + 1) == proc->burst) { //Si en el proxim tick ja s'ha consumit burst donem proces per completat
+                proc->completed = true;
+                proc->return_time = current_time + 1;
+                proc->waiting_time = proc->return_time - proc->arrive_time - proc->burst;
+                completed++;
+            }
+
             current_time++;
-            continue;
         }
-
-        Process *proc = &procTable[best];
-
-        proc->lifecycle[current_time] = Running;
-
-        // Ejecutar el proceso seleccionado
-        for (int t = current_time; t < current_time + proc->burst; t++)
-        {
-            proc->lifecycle[t] = Running;
-        }
-
-        proc->completed = true;
-        proc->response_time = current_time - proc->arrive_time;
-        proc->waiting_time = proc->response_time;
-        current_time += proc->burst;
-        proc->return_time = current_time;
-
-        completed++;
     }
 
     return 0;
@@ -450,21 +424,21 @@ int priority(Process *procTable, size_t nprocs, int preemptive)
     size_t completed = 0;
 
     while (completed < nprocs){
-        int best = -1;
+        int posBest = -1;
         for (size_t p = 0; p < nprocs; p++){
             if (!procTable[p].completed && procTable[p].arrive_time <= current_time){
-                if (best == -1 || procTable[p].priority < procTable[best].priority){
-                    best = (int)p;
+                if (posBest == -1 || procTable[p].priority < procTable[posBest].priority){
+                    posBest = (int)p;
                 }
             }
         }
 
-        if (best == -1){
+        if (posBest == -1){
             current_time++;
             continue;
         }
 
-        Process *proc = &procTable[best];
+        Process *proc = &procTable[posBest];
 
         if (!preemptive){
             //no preemptiu: executa fins acabar
