@@ -208,23 +208,25 @@ int fcfs(Process *procTable, size_t nprocs)
 
     for (size_t p = 0; p < nprocs; p++)
     {
-        // Esperar si el proceso llega más tarde que el tiempo actual
-        if (procTable[p].arrive_time > current_time)
+        enqueue(&procTable[p]); //com que els procesos ja venen ordenats per el qsort els afegim en la cua tots directament
+    }
+
+    while (get_queue_size() > 0)
+    {
+        Process *proc = dequeue();
+
+        if (current_time < proc->arrive_time) current_time = proc->arrive_time;
+
+        for (int t = current_time; t < current_time + proc->burst; t++)  //executem fins a finalitzar
         {
-            current_time = procTable[p].arrive_time;
+            proc->lifecycle[t] = Running;
         }
 
-        // Ejecutar el proceso desde current_time hasta que termine
-        for (int t = current_time; t < current_time + procTable[p].burst; t++)
-        {
-            procTable[p].lifecycle[t] = Running;
-        }
-
-        procTable[p].completed = true;
-        procTable[p].response_time = current_time - procTable[p].arrive_time;
-        procTable[p].waiting_time = current_time - procTable[p].arrive_time;
-        current_time += procTable[p].burst;
-        procTable[p].return_time = current_time;
+        proc->completed = true;
+        proc->response_time = current_time - proc->arrive_time;
+        proc->waiting_time = proc->response_time;
+        current_time += proc->burst;
+        proc->return_time = current_time;
     }
 
     return 0;
