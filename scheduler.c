@@ -278,6 +278,104 @@ int sjf(Process *procTable, size_t nprocs, int preemptive)
     return 0;
 }
 
+int sjf(Process *procTable, size_t nprocs, int preemptive)
+{
+    printf("Ejecutando %s...\n", preemptive ? "SJRT (preemptivo)" : "SJF (no preemptivo)");
+
+    int current_time = 0;
+    size_t completed = 0;
+
+    while (completed < nprocs)
+    {
+        int best = -1;
+        for (size_t p = 0; p < nprocs; p++)
+        {
+            if (!procTable[p].completed && procTable[p].arrive_time <= current_time)
+            {
+                if (best == -1 || procTable[p].burst < procTable[best].burst)
+                {
+                    best = (int)p;
+                }
+            }
+        }
+
+        if (best == -1)
+        {
+            // No hay proceso disponible todavía, avanzamos el tiempo
+            current_time++;
+            continue;
+        }
+
+        Process *proc = &procTable[best];
+
+        // Ejecutar el proceso seleccionado
+        for (int t = current_time; t < current_time + proc->burst; t++)
+        {
+            proc->lifecycle[t] = Running;
+        }
+
+        proc->completed = true;
+        proc->response_time = current_time - proc->arrive_time;
+        proc->waiting_time = proc->response_time;
+        current_time += proc->burst;
+        proc->return_time = current_time;
+
+        completed++;
+    }
+
+    return 0;
+}
+
+int sjrt(Process *procTable, size_t nprocs, int preemptive)
+{
+    printf("Ejecutando %s...\n", preemptive ? "SJRT (preemptivo)" : "SJF (no preemptivo)");
+
+    int current_time = 0;
+    size_t completed = 0;
+
+    while (completed < nprocs)
+    {
+        int best = -1;
+        for (size_t p = 0; p < nprocs; p++)
+        {
+            if (!procTable[p].completed && procTable[p].arrive_time <= current_time)
+            {
+                if (best == -1 || procTable[p].burst < procTable[best].burst)
+                {
+                    best = (int)p;
+                }
+            }
+        }
+
+        if (best == -1)
+        {
+            // No hay proceso disponible todavía, avanzamos el tiempo
+            current_time++;
+            continue;
+        }
+
+        Process *proc = &procTable[best];
+
+        proc->lifecycle[current_time] = Running;
+
+        // Ejecutar el proceso seleccionado
+        for (int t = current_time; t < current_time + proc->burst; t++)
+        {
+            proc->lifecycle[t] = Running;
+        }
+
+        proc->completed = true;
+        proc->response_time = current_time - proc->arrive_time;
+        proc->waiting_time = proc->response_time;
+        current_time += proc->burst;
+        proc->return_time = current_time;
+
+        completed++;
+    }
+
+    return 0;
+}
+
 int rr(Process *procTable, size_t nprocs, int quantum)
 {
     printf("Ejecutando Round Robin con quantum=%d...\n", quantum);
