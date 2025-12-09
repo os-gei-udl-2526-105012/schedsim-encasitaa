@@ -27,8 +27,8 @@ int getCurrentBurst(Process* proc, int current_time);
 size_t getTotalCPU(Process *procTable, size_t nprocs);
 
 // Prototips de les funcions auxiliars
-int fcfs(Process *procTable, size_t nprocs);
-int sjf(Process *procTable, size_t nprocs, int preemptive);
-int rr(Process *procTable, size_t nprocs, int quantum);
-int priority(Process *procTable, size_t nprocs, int preemptive);
+int run_generic(Process *p, size_t n, int alg, int mod, int q);
+size_t select_fcfs(Process *p, size_t n, int t, int q);
+size_t select_sjf(Process *p, size_t n, int t, int pre);
+size_t select_priority(Process *p, size_t n, int t, int pre);
 #endif
