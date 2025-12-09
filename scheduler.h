@@ -31,4 +31,6 @@ int run_generic(Process *p, size_t n, int alg, int mod, int q);
 size_t select_fcfs(Process *p, size_t n, int t, int q);
 size_t select_sjf(Process *p, size_t n, int t, int pre);
 size_t select_priority(Process *p, size_t n, int t, int pre);
+void enqueue_arrivals(Process *p, size_t n, int t, bool *enq);
+
 #endif

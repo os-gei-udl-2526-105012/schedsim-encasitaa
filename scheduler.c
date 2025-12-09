@@ -98,7 +98,7 @@ int run_dispatcher(Process *procTable, size_t nprocs, int algorithm, int modalit
         }
         procTable[p].waiting_time = 0;
         procTable[p].return_time = 0;
-        procTable[p].response_time = 0;
+        procTable[p].response_time = -1; // Se cambia a -1, se queda en bucle
         procTable[p].completed = false;
     }
 
@@ -208,68 +208,122 @@ size_t select_priority(Process *p, size_t n, int t, int pre) {
     return pos;
 }
 
-int run_generic(Process *p, size_t n, int alg, int mod, int q) {
-    printf("Ejecutando %s...\n", algorithmsNames[alg]);
-    int t = 0; size_t done = 0;
-
-    size_t (*sel)(Process*, size_t, int, int) = // selector según algoritmo
-        (alg == FCFS ? select_fcfs : 
-         alg == SJF ? select_sjf : 
-         alg == PRIORITIES ? select_priority : NULL);
-
-    while (done < n) {
-        size_t pos = (alg == RR) ? (size_t)-1 : sel(p, n, t, mod);
-
-        if (alg == RR) { // Round Robin: ejecuta por quantum y alterna procesos
-            for (size_t i = 0; i < n; i++) if (!p[i].completed && p[i].arrive_time == t) enqueue(&p[i]); // añadir procesos que llegan
-            if (!get_queue_size()) { t++; continue; } // si no hay nada, avanzar tiempo
-
-            Process *cur = dequeue(); // tomar siguiente proceso
-            if (cur->response_time < 0) cur->response_time = t - cur->arrive_time; // primera respuesta
-
-            int rem = cur->burst - getCurrentBurst(cur, t); 
-            int run = (rem < q ? rem : q); // ejecutar quantum o lo que quede
-
-            for (int k = t; k < t + run; k++) cur->lifecycle[k] = Running; // marcar ejecución
-            t += run;
-
-            for (size_t i = 0; i < n; i++) if (!p[i].completed && p[i].arrive_time <= t && p[i].arrive_time > t - run) enqueue(&p[i]); // añadir procesos que llegaron durante quantum
-
-            if (cur->burst - getCurrentBurst(cur, t) == 0) { // si terminó
-                cur->completed = true; cur->return_time = t; 
-                cur->waiting_time = t - cur->arrive_time - cur->burst; 
-                done++;
-            } else enqueue(cur); // si no terminó, vuelve a la cola
-
-        } else if (pos == (size_t)-1) { t++; continue; } // ningún proceso disponible → avanzar tiempo
-        else {
-            Process *cur = &p[pos];
-
-            if (alg == SJF && mod == PREEMPTIVE) { // SJRT: ejecuta 1 tick y reevalúa
-                if (!getCurrentBurst(cur, t)) cur->response_time = t - cur->arrive_time; 
-                cur->lifecycle[t] = Running;
-                if (getCurrentBurst(cur, t + 1) == cur->burst) { // si terminó
-                    cur->completed = true; cur->return_time = t + 1; 
-                    cur->waiting_time = cur->return_time - cur->arrive_time - cur->burst; 
-                    done++;
-                }
-                t++;
-            } else if (alg == PRIORITIES && mod == PREEMPTIVE) { // Prioridades preemptivo: ejecuta 1 tick y reevalúa
-                cur->lifecycle[t] = Running;
-                if (getCurrentBurst(cur, t + 1) == cur->burst) { // si terminó
-                    cur->completed = true; cur->return_time = t + 1; 
-                    cur->waiting_time = cur->return_time - cur->arrive_time - cur->burst; 
-                    done++;
-                }
-                t++;
-            } else { // FCFS, SJF no preemptivo, Prioridad no preemptiva
-                if (cur->response_time < 0) cur->response_time = t - cur->arrive_time; 
-                for (int k = t; k < t + cur->burst; k++) cur->lifecycle[k] = Running; // ejecuta hasta terminar
-                cur->completed = true; cur->waiting_time = t - cur->arrive_time; 
-                t += cur->burst; cur->return_time = t; 
-                done++;
-            }
+void enqueue_arrivals(Process *p, size_t n, int t, bool *enq) {
+    for (size_t i = 0; i < n; i++) {
+        if (!p[i].completed && p[i].arrive_time <= t && !enq[i]) {
+            enqueue(&p[i]);
+            enq[i] = true;
         }
     }
+}
+
+int run_generic(Process *p, size_t n, int alg, int mod, int q) {
+    printf("Ejecutando %s...\n", algorithmsNames[alg]);
+
+    int t = 0;
+    size_t done = 0;
+
+    // Marca local para saber si cada proceso ya fue encolado al menos una vez
+    bool *enq = calloc(n, sizeof(bool));
+    if (!enq) return -1;
+
+    while (done < n) {
+        // Encolar todo lo que ya haya llegado y no esté en cola
+        enqueue_arrivals(p, n, t, enq);
+
+        // Si no hay nada que ejecutar, avanzar el tiempo
+        if (!get_queue_size()) { t++; continue; }
+
+        // Tomar candidato de la cola
+        Process *cur = dequeue();
+
+        // Si el proceso ya se completó (pudo completarse justo al encolarse/reevaluarse), saltar
+        if (cur->completed) continue;
+
+        // Selección “mejor” proceso desde la cola para SJF/Prioridades
+        if (alg == SJF || alg == PRIORITIES) {
+            size_t size = get_queue_size();
+            Process *best = cur;
+
+            for (size_t i = 0; i < size; i++) {
+                Process *tmp = dequeue();
+                if (tmp->completed) { continue; } // ignorar completados
+
+                int better =
+                    (alg == SJF)
+                        ? (tmp->burst - getCurrentBurst(tmp, t) <
+                           best->burst - getCurrentBurst(best, t))
+                        : (tmp->priority < best->priority);
+
+                if (better) {
+                    enqueue(best);
+                    best = tmp;
+                } else {
+                    enqueue(tmp);
+                }
+            }
+            cur = best;
+        }
+
+        // Ejecutar según algoritmo/modo
+        if (alg == RR) {
+            // Round Robin
+            int rem = cur->burst - getCurrentBurst(cur, t);
+            int run = (rem < q ? rem : q);
+
+            if (cur->response_time < 0) cur->response_time = t - cur->arrive_time;
+
+            for (int k = t; k < t + run; k++) cur->lifecycle[k] = Running;
+            t += run;
+
+            // Encolar nuevas llegadas durante el quantum (sin duplicar)
+            enqueue_arrivals(p, n, t, enq);
+
+            // ¿Terminó?
+            if (cur->burst - getCurrentBurst(cur, t) == 0) {
+                cur->completed = true;
+                cur->return_time = t;
+                cur->waiting_time = t - cur->arrive_time - cur->burst;
+                done++;
+            } else {
+                enqueue(cur);
+            }
+        } else if ((alg == SJF && mod == PREEMPTIVE) ||
+                   (alg == PRIORITIES && mod == PREEMPTIVE)) {
+            // Un tick y reevaluar
+            cur->lifecycle[t] = Running;
+            if (cur->response_time < 0) cur->response_time = t - cur->arrive_time;
+            t++;
+
+            // Encolar nuevas llegadas (sin duplicar)
+            enqueue_arrivals(p, n, t, enq);
+
+            // ¿Terminó?
+            if (getCurrentBurst(cur, t) == cur->burst) {
+                cur->completed = true;
+                cur->return_time = t;
+                cur->waiting_time = t - cur->arrive_time - cur->burst;
+                done++;
+            } else {
+                enqueue(cur);
+            }
+        } else {
+            // FCFS / SJF no-preemptivo / Prioridades no-preemptivo
+            if (cur->response_time < 0) cur->response_time = t - cur->arrive_time;
+
+            for (int k = t; k < t + cur->burst; k++) cur->lifecycle[k] = Running;
+            t += cur->burst;
+
+            cur->completed = true;
+            cur->return_time = t;
+            cur->waiting_time = cur->return_time - cur->arrive_time - cur->burst;
+            done++;
+
+            // Encolar nuevas llegadas al terminar (sin duplicar)
+            enqueue_arrivals(p, n, t, enq);
+        }
+    }
+
+    free(enq);
     return 0;
 }
